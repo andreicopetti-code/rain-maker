@@ -2,7 +2,13 @@
 
 import { useState, useRef, useCallback, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { EmpresaPreview, EmpresaDetail, CnpjUsage, CnpjHistoryItem, OrgUfAccess } from '@/app/empresas/actions';
+import type {
+  EmpresaPreview,
+  EmpresaDetail,
+  CnpjUsage,
+  CnpjHistoryItem,
+  OrgUfAccess,
+} from '@/lib/empresas/types';
 import {
   searchCnpjPreview,
   getEmpresaDetail,

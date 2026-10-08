@@ -1,5 +1,5 @@
 import { REGIMES_TRIBUTARIOS, SETORES } from '@/components/board/types';
-import type { EmpresaDetail } from '@/app/empresas/actions';
+import type { EmpresaDetail } from '@/lib/empresas/types';
 
 export function parseSocios(socios: string | null): string[] {
   if (!socios?.trim()) return [];
