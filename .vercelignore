@@ -1,6 +1,6 @@
-# Local data must never ship with CLI deploys
+# Local data must never ship with CLI deploys.
+# Do NOT list "Empresas/" — on Linux/Vercel that can case-match apps/**/empresas.
 tools/empresa-cleaner/data/
-Empresas/
 scripts/empresaqui-sync/data/
 scripts/empresaqui-sync/downloads/
 **/*.csv
