@@ -1,4 +1,7 @@
 import Stripe from 'stripe';
+import type { BillingInterval } from '@/lib/billing/intervals';
+
+export type { BillingInterval } from '@/lib/billing/intervals';
 
 let stripeClient: Stripe | null = null;
 
@@ -34,4 +37,19 @@ export function resolveMonthlyPriceId(dbPriceId: string | null | undefined): str
     process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY?.trim() ||
     null
   );
+}
+
+/** Price ID anual: apenas o valor gravado em plans.stripe_price_annual_id. */
+export function resolveAnnualPriceId(dbPriceId: string | null | undefined): string | null {
+  return dbPriceId?.trim() || null;
+}
+
+export function resolvePlanPriceId(
+  interval: BillingInterval,
+  monthlyId: string | null | undefined,
+  annualId: string | null | undefined,
+): string | null {
+  return interval === 'year'
+    ? resolveAnnualPriceId(annualId)
+    : resolveMonthlyPriceId(monthlyId);
 }

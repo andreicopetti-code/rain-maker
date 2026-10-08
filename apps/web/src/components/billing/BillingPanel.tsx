@@ -14,6 +14,7 @@ import {
   type BillingSummary,
 } from '@/app/billing/actions';
 import type { PlanSlug } from '@ceo-brain/shared';
+import type { BillingInterval } from '@/lib/billing/intervals';
 import { OrganizationUfSelector } from '@/components/settings/OrganizationUfSelector';
 import type { OrganizationUfSettings } from '@/app/configuracoes/actions';
 
@@ -57,6 +58,7 @@ export function BillingPanel({ summary, plans, addons, ufSettings = null }: Prop
   const addonConfirmed = searchParams.get('addon_confirmed') === '1';
   const canceled = searchParams.get('canceled') === '1';
   const planFromUrl = searchParams.get('plan');
+  const intervalFromUrl = searchParams.get('interval');
 
   const processedSessionRef = useRef<string | null>(null);
 
@@ -68,16 +70,36 @@ export function BillingPanel({ summary, plans, addons, ufSettings = null }: Prop
   }, [planFromUrl, summary.plan?.slug]);
 
   const [selectedSlug, setSelectedSlug] = useState<PlanSlug>(defaultSlug);
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>(
+    intervalFromUrl === 'year' || intervalFromUrl === 'annual' ? 'year' : 'month',
+  );
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState<'checkout' | 'portal' | null>(null);
   const [, startTransition] = useTransition();
 
-  const selectedPlan = plans.find((p) => p.slug === selectedSlug) ?? plans[0];
-
   useEffect(() => {
     if (isPlanSlug(planFromUrl)) setSelectedSlug(planFromUrl);
   }, [planFromUrl]);
+
+  useEffect(() => {
+    if (intervalFromUrl === 'year' || intervalFromUrl === 'annual') setBillingInterval('year');
+    else if (intervalFromUrl === 'month' || intervalFromUrl === 'monthly') setBillingInterval('month');
+  }, [intervalFromUrl]);
+
+  const selectedPlan = plans.find((p) => p.slug === selectedSlug) ?? plans[0];
+  const selectedPriceConfigured =
+    billingInterval === 'year'
+      ? !!selectedPlan?.stripeAnnualConfigured
+      : !!selectedPlan?.stripeConfigured;
+  const displayPrice =
+    billingInterval === 'year'
+      ? `R$ ${selectedPlan?.priceAnnual ?? 0}/ano`
+      : `R$ ${selectedPlan?.priceMonthly ?? 0}/mês`;
+  const checkoutLabel =
+    billingInterval === 'year'
+      ? `Assinar ${selectedPlan?.name ?? ''} (anual)`
+      : `Assinar ${selectedPlan?.name ?? ''} (mensal)`;
 
   useEffect(() => {
     if (!success || !sessionId || summary.isActive) return;
@@ -156,7 +178,7 @@ export function BillingPanel({ summary, plans, addons, ufSettings = null }: Prop
     if (!selectedPlan) return;
     setError(null);
     setLoading('checkout');
-    const result = await createCheckoutSession(selectedPlan.slug);
+    const result = await createCheckoutSession(selectedPlan.slug, billingInterval);
     setLoading(null);
     if ('error' in result) {
       setError(result.error);
@@ -180,7 +202,7 @@ export function BillingPanel({ summary, plans, addons, ufSettings = null }: Prop
   const canSubscribe =
     summary.canManageBilling &&
     summary.stripeConfigured &&
-    selectedPlan?.stripeConfigured &&
+    selectedPriceConfigured &&
     (summary.isTrial || summary.isFreePlan || !summary.isActive);
 
   return (
@@ -296,20 +318,55 @@ export function BillingPanel({ summary, plans, addons, ufSettings = null }: Prop
             </p>
           )}
 
+          <div className="billing-interval-toggle" role="group" aria-label="Periodicidade">
+            <button
+              type="button"
+              className={`billing-interval-btn${billingInterval === 'month' ? ' selected' : ''}`}
+              onClick={() => setBillingInterval('month')}
+            >
+              Mensal
+            </button>
+            <button
+              type="button"
+              className={`billing-interval-btn${billingInterval === 'year' ? ' selected' : ''}`}
+              onClick={() => setBillingInterval('year')}
+            >
+              Anual
+              {selectedPlan?.annualSavings ? (
+                <span className="billing-interval-save">
+                  −R$ {selectedPlan.annualSavings}
+                </span>
+              ) : null}
+            </button>
+          </div>
+
           <div className="billing-plan-picker">
-            {plans.map((plan) => (
-              <button
-                key={plan.slug}
-                type="button"
-                className={`billing-plan-option${selectedSlug === plan.slug ? ' selected' : ''}${!plan.stripeConfigured ? ' disabled' : ''}`}
-                onClick={() => setSelectedSlug(plan.slug)}
-              >
-                <span className="billing-plan-option-name">{plan.name}</span>
-                <span className="billing-plan-option-price">R$ {plan.priceMonthly}/mês</span>
-                <span className="billing-plan-option-meta">{plan.ufLabel}</span>
-                <span className="billing-plan-option-meta">{plan.fichaLabel}</span>
-              </button>
-            ))}
+            {plans.map((plan) => {
+              const ready =
+                billingInterval === 'year' ? plan.stripeAnnualConfigured : plan.stripeConfigured;
+              const priceLabel =
+                billingInterval === 'year'
+                  ? `R$ ${plan.priceAnnual}/ano`
+                  : `R$ ${plan.priceMonthly}/mês`;
+              return (
+                <button
+                  key={plan.slug}
+                  type="button"
+                  className={`billing-plan-option${selectedSlug === plan.slug ? ' selected' : ''}${!ready ? ' disabled' : ''}`}
+                  onClick={() => setSelectedSlug(plan.slug)}
+                >
+                  <span className="billing-plan-option-name">{plan.name}</span>
+                  <span className="billing-plan-option-price">{priceLabel}</span>
+                  {billingInterval === 'year' && plan.annualSavings > 0 ? (
+                    <span className="billing-plan-option-meta">
+                      Economize R$ {plan.annualSavings}
+                    </span>
+                  ) : null}
+                  <span className="billing-plan-option-meta">{plan.ufLabel}</span>
+                  <span className="billing-plan-option-meta">{plan.fichaLabel}</span>
+                </button>
+              );
+            })}
           </div>
 
           {selectedPlan && (
@@ -320,10 +377,15 @@ export function BillingPanel({ summary, plans, addons, ufSettings = null }: Prop
             </ul>
           )}
 
-          {summary.stripeConfigured && selectedPlan && !selectedPlan.stripeConfigured && (
+          {summary.stripeConfigured && selectedPlan && !selectedPriceConfigured && (
             <p className="billing-hint billing-hint--warn">
-              Price ID do Stripe ausente para {selectedPlan.name}. Rode npm run billing:setup.
+              Preço {billingInterval === 'year' ? 'anual' : 'mensal'} do Stripe ausente para{' '}
+              {selectedPlan.name}. Rode npm run billing:setup.
             </p>
+          )}
+
+          {selectedPlan && selectedPriceConfigured && (
+            <p className="billing-meta">Total no checkout: <strong>{displayPrice}</strong></p>
           )}
 
           <div className="billing-actions">
@@ -334,7 +396,7 @@ export function BillingPanel({ summary, plans, addons, ufSettings = null }: Prop
                 disabled={loading !== null}
                 onClick={() => startTransition(() => void handleCheckout())}
               >
-                {loading === 'checkout' ? 'Redirecionando…' : `Assinar ${selectedPlan?.name ?? ''}`}
+                {loading === 'checkout' ? 'Redirecionando…' : checkoutLabel}
               </button>
             )}
 

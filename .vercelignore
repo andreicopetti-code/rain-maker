@@ -1,0 +1,14 @@
+# Local data must never ship with CLI deploys
+tools/empresa-cleaner/data/
+Empresas/
+scripts/empresaqui-sync/data/
+scripts/empresaqui-sync/downloads/
+**/*.csv
+**/*.xlsx
+**/*.parquet
+node_modules/
+apps/web/.next/
+.turbo/
+coverage/
+dist/
+.git/

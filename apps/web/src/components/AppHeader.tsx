@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { getUnreadEmailCount } from '@/app/emails/actions';
 import { FunnelHeaderTools } from '@/components/funnel/FunnelHeaderTools';
+import { HeaderNavLink } from '@/components/HeaderNavLink';
 import { UserMenu } from '@/components/UserMenu';
 import { useTheme } from '@/components/ThemeProvider';
 import { APP_AI_NAME, APP_AI_NAV_LABEL, APP_LOGO_PATH, APP_NAME } from '@/lib/brand';
@@ -33,7 +34,7 @@ export function AppHeader() {
 
   return (
     <header className="header">
-      <Link href="/funil" className="logo" prefetch>
+      <Link href="/funil" className="logo" prefetch={false}>
         <div className="logo-icon">
           <Image src={APP_LOGO_PATH} alt={APP_NAME} width={40} height={40} priority />
         </div>
@@ -43,7 +44,7 @@ export function AppHeader() {
       </Link>
 
       <nav className="header-nav" role="navigation" aria-label="Navegação principal">
-        <Link href="/funil" className={`btn-nav${isFunil ? ' active' : ''}`} aria-label="Funil de vendas" prefetch>
+        <HeaderNavLink href="/funil" active={isFunil} ariaLabel="Funil de vendas">
           <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
             <rect x="2" y="3" width="20" height="3" rx="1" />
             <rect x="4" y="8" width="15" height="3" rx="1" />
@@ -51,16 +52,16 @@ export function AppHeader() {
             <rect x="10" y="18" width="4" height="3" rx="1" />
           </svg>
           <span>Funil</span>
-        </Link>
+        </HeaderNavLink>
 
-        <Link href="/agenda" className={`btn-nav${isAgenda ? ' active' : ''}`} aria-label="Agenda" prefetch>
+        <HeaderNavLink href="/agenda" active={isAgenda} ariaLabel="Agenda">
           <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
             <path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H5V9h14v12zM5 7V5h14v2H5zm2 4h5v5H7z"/>
           </svg>
           <span>Agenda</span>
-        </Link>
+        </HeaderNavLink>
 
-        <Link href="/dashboard" className={`btn-nav${isDashboard ? ' active' : ''}`} aria-label="Dashboard" prefetch>
+        <HeaderNavLink href="/dashboard" active={isDashboard} ariaLabel="Dashboard">
           <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
             <rect x="2" y="16" width="4" height="6" rx="1" />
             <rect x="8" y="11" width="4" height="11" rx="1" />
@@ -68,21 +69,20 @@ export function AppHeader() {
             <rect x="20" y="13" width="2" height="9" rx="1" />
           </svg>
           <span>Dashboard</span>
-        </Link>
+        </HeaderNavLink>
 
-        <Link href="/contatos" className={`btn-nav${isContatos ? ' active' : ''}`} aria-label="Contatos" prefetch>
+        <HeaderNavLink href="/contatos" active={isContatos} ariaLabel="Contatos">
           <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
             <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
           </svg>
           <span>Contatos</span>
-        </Link>
+        </HeaderNavLink>
 
-        <Link
+        <HeaderNavLink
           href="/emails"
-          className={`btn-nav${isEmails ? ' active' : ''}`}
-          aria-label="E-mails"
+          active={isEmails}
+          ariaLabel="E-mails"
           style={{ position: 'relative' }}
-          prefetch
         >
           <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
             <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" />
@@ -110,21 +110,21 @@ export function AppHeader() {
               {unreadEmails > 99 ? '99+' : unreadEmails}
             </span>
           ) : null}
-        </Link>
+        </HeaderNavLink>
 
-        <Link href="/empresas" className={`btn-nav${isEmpresas ? ' active' : ''}`} aria-label="Consulta CNPJ" prefetch>
+        <HeaderNavLink href="/empresas" active={isEmpresas} ariaLabel="Consulta CNPJ">
           <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
             <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
           </svg>
           <span>Empresas</span>
-        </Link>
+        </HeaderNavLink>
 
-        <Link href="/ceo" className={`btn-nav btn-nav-ceo${isCeo ? ' active' : ''}`} aria-label={APP_AI_NAME} prefetch>
+        <HeaderNavLink href="/ceo" active={isCeo} ariaLabel={APP_AI_NAME} className="btn-nav-ceo">
           <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
             <path d="M12 2 L14 9 L21 11 L14 13 L12 20 L10 13 L3 11 L10 9 Z" />
           </svg>
           <span>{APP_AI_NAV_LABEL}</span>
-        </Link>
+        </HeaderNavLink>
       </nav>
 
       <FunnelHeaderTools />

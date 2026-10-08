@@ -334,6 +334,7 @@ body {
 }
 
 .btn-nav {
+  position: relative;
   padding: 7px 10px;
   background: transparent;
   color: var(--text2);
@@ -353,7 +354,30 @@ body {
 }
 .btn-nav:hover { background: var(--surface2); color: var(--text); }
 .btn-nav.active { background: var(--blue-bg); color: var(--blue-dark); border-color: #B6D4F5; }
+.btn-nav:has(.btn-nav-pending-mark) { background: var(--surface2); color: var(--text); }
+.btn-nav-pending-mark {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
 .btn-nav svg { width: 15px; height: 15px; flex-shrink: 0; }
+.header:has(.btn-nav-pending-mark)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  transform-origin: left;
+  background: var(--blue);
+  animation: nav-progress 0.9s ease-in-out infinite;
+}
+@keyframes nav-progress {
+  0% { transform: scaleX(0.08); opacity: .55; }
+  50% { transform: scaleX(0.72); opacity: 1; }
+  100% { transform: scaleX(1); opacity: .7; }
+}
 
 .btn-nav-ceo {
   font-weight: 700;

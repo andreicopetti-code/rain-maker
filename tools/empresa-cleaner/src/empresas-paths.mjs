@@ -37,6 +37,8 @@ const STATE_SLUG_TO_DIR = {
   rj: 'RJ',
   rn: 'RN',
   ro: 'RO',
+  rr: 'RR',
+  roraima: 'RR',
   rs: 'RS',
   sc: 'SC',
   sp: 'SP',

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Cria produtos/preços no Stripe para planos pagos + add-ons.
- * Grava stripe_price_monthly_id em public.plans (via features.slug).
+ * Grava stripe_price_monthly_id e stripe_price_annual_id em public.plans.
  *
  * Uso:
  *   npm run billing:setup              # test + apps/web/.env.local
@@ -20,15 +20,33 @@ const syncEnvPath = resolve(__dirname, 'empresaqui-sync/.env');
 const LIVE = process.argv.includes('--live');
 
 const PAID_PLANS = [
-  { slug: 'regional_1', name: 'CEO Brain — Regional 1', amount: 9900, desc: '1 UF · 20 fichas/dia · 3 usuários' },
-  { slug: 'regional_3', name: 'CEO Brain — Regional 3', amount: 24900, desc: '3 UFs · 50 fichas/dia · 8 usuários' },
-  { slug: 'nacional', name: 'CEO Brain — Nacional', amount: 39900, desc: 'Brasil + DF · 80 fichas/dia · 15 usuários' },
+  {
+    slug: 'regional_1',
+    name: 'RainMaker — Regional 1',
+    amountMonthly: 9900,
+    amountAnnual: 99000,
+    desc: '1 UF · 20 fichas/dia · 3 usuários',
+  },
+  {
+    slug: 'regional_3',
+    name: 'RainMaker — Regional 3',
+    amountMonthly: 24900,
+    amountAnnual: 249000,
+    desc: '3 UFs · 50 fichas/dia · 8 usuários',
+  },
+  {
+    slug: 'nacional',
+    name: 'RainMaker — Nacional',
+    amountMonthly: 39900,
+    amountAnnual: 399000,
+    desc: 'Brasil + DF · 80 fichas/dia · 15 usuários',
+  },
 ];
 
 const ADDONS = [
-  { slug: 'uf_extra', name: 'CEO Brain — +1 UF', amount: 4900, recurring: true },
-  { slug: 'pack_50', name: 'CEO Brain — Pacote 50 fichas', amount: 2900, recurring: false },
-  { slug: 'pack_200', name: 'CEO Brain — Pacote 200 fichas', amount: 8900, recurring: false },
+  { slug: 'uf_extra', name: 'RainMaker — +1 UF', amount: 4900, recurring: true },
+  { slug: 'pack_50', name: 'RainMaker — Pacote 50 fichas', amount: 2900, recurring: false },
+  { slug: 'pack_200', name: 'RainMaker — Pacote 200 fichas', amount: 8900, recurring: false },
 ];
 
 const WEBHOOK_EVENTS = [
@@ -93,49 +111,102 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-console.log(`\n🔧 CEO Brain — setup Stripe (${LIVE ? 'LIVE' : 'test'})`);
+console.log(`\n🔧 RainMaker — setup Stripe (${LIVE ? 'LIVE' : 'test'})`);
 console.log(`   Supabase: ${SUPABASE_URL}\n`);
 
 const { data: dbPlans, error: plansErr } = await supabase
   .from('plans')
-  .select('id, name, features, stripe_price_monthly_id');
+  .select('id, name, features, stripe_price_monthly_id, stripe_price_annual_id');
 
 if (plansErr) fail(plansErr.message);
 
-async function ensureRecurringPrice(planRow, catalog) {
-  let priceId = planRow.stripe_price_monthly_id?.trim() || '';
-  if (priceId) {
-    try {
-      await stripe.prices.retrieve(priceId);
-      console.log(`✓ ${catalog.name}: ${priceId} (existente)`);
-      return priceId;
-    } catch {
-      console.log(`⚠ ${catalog.name}: price inválido, recriando…`);
-      priceId = '';
-    }
+async function priceExists(priceId) {
+  if (!priceId?.trim()) return false;
+  try {
+    await stripe.prices.retrieve(priceId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureProduct(catalog, planRow, existingMonthlyId) {
+  if (existingMonthlyId && (await priceExists(existingMonthlyId))) {
+    const price = await stripe.prices.retrieve(existingMonthlyId);
+    const productId = typeof price.product === 'string' ? price.product : price.product.id;
+    return productId;
   }
 
   const product = await stripe.products.create({
     name: catalog.name,
     description: catalog.desc,
-    metadata: { app: 'ceo-brain', plan_slug: catalog.slug, plan_id: planRow.id },
+    metadata: { app: 'rainmaker', plan_slug: catalog.slug, plan_id: planRow.id },
   });
+  return product.id;
+}
+
+async function ensureIntervalPrice({
+  planRow,
+  catalog,
+  productId,
+  interval,
+  amount,
+  column,
+  existingId,
+}) {
+  if (existingId && (await priceExists(existingId))) {
+    console.log(`✓ ${catalog.name} (${interval}): ${existingId} (existente)`);
+    return existingId;
+  }
 
   const price = await stripe.prices.create({
-    product: product.id,
-    unit_amount: catalog.amount,
+    product: productId,
+    unit_amount: amount,
     currency: 'brl',
-    recurring: { interval: 'month' },
-    metadata: { plan_slug: catalog.slug, plan_id: planRow.id },
+    recurring: { interval },
+    metadata: {
+      plan_slug: catalog.slug,
+      plan_id: planRow.id,
+      billing_interval: interval === 'year' ? 'annual' : 'monthly',
+    },
   });
 
   await supabase
     .from('plans')
-    .update({ stripe_price_monthly_id: price.id })
+    .update({ [column]: price.id })
     .eq('id', planRow.id);
 
-  console.log(`✓ ${catalog.name}: ${price.id} (R$ ${catalog.amount / 100}/mês)`);
+  const label = interval === 'year' ? '/ano' : '/mês';
+  console.log(`✓ ${catalog.name} (${interval}): ${price.id} (R$ ${amount / 100}${label})`);
   return price.id;
+}
+
+async function ensurePlanPrices(planRow, catalog) {
+  const monthlyExisting = planRow.stripe_price_monthly_id?.trim() || '';
+  const annualExisting = planRow.stripe_price_annual_id?.trim() || '';
+  const productId = await ensureProduct(catalog, planRow, monthlyExisting);
+
+  const monthlyId = await ensureIntervalPrice({
+    planRow,
+    catalog,
+    productId,
+    interval: 'month',
+    amount: catalog.amountMonthly,
+    column: 'stripe_price_monthly_id',
+    existingId: monthlyExisting,
+  });
+
+  const annualId = await ensureIntervalPrice({
+    planRow,
+    catalog,
+    productId,
+    interval: 'year',
+    amount: catalog.amountAnnual,
+    column: 'stripe_price_annual_id',
+    existingId: annualExisting,
+  });
+
+  return { monthlyId, annualId };
 }
 
 const envLines = [];
@@ -146,9 +217,9 @@ for (const catalog of PAID_PLANS) {
     console.log(`⚠ Plano ${catalog.slug} não encontrado no banco — aplique a migration pricing_plans_matrix`);
     continue;
   }
-  const priceId = await ensureRecurringPrice(row, catalog);
+  const { monthlyId } = await ensurePlanPrices(row, catalog);
   if (catalog.slug === 'regional_1') {
-    envLines.push(`STRIPE_PRICE_PRO_MONTHLY=${priceId}`);
+    envLines.push(`STRIPE_PRICE_PRO_MONTHLY=${monthlyId}`);
   }
 }
 
@@ -181,7 +252,7 @@ for (const addon of ADDONS) {
 
   const product = await stripe.products.create({
     name: addon.name,
-    metadata: { app: 'ceo-brain', addon_slug: addon.slug },
+    metadata: { app: 'rainmaker', addon_slug: addon.slug },
   });
 
   const priceParams = {
@@ -244,5 +315,5 @@ if (LIVE) {
 console.log(
   LIVE
     ? '\nPróximo: colar STRIPE_SECRET_KEY (live) + STRIPE_WEBHOOK_SECRET (live) na Vercel Production e redeploy.\n'
-    : '\nPróximo: npm run dev → /precos ou /billing\n',
+    : '\nPróximo: npm run billing:setup (se ainda não rodou) → npm run dev → /billing (toggle Mensal/Anual)\n',
 );

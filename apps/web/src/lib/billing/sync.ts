@@ -60,12 +60,19 @@ export async function resolveFreePlanId(): Promise<string | null> {
 
 export async function resolvePlanIdFromStripePrice(priceId: string): Promise<string | null> {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data: monthly } = await admin
     .from('plans')
     .select('id')
     .eq('stripe_price_monthly_id', priceId)
     .maybeSingle();
-  return data?.id ?? null;
+  if (monthly?.id) return monthly.id;
+
+  const { data: annual } = await admin
+    .from('plans')
+    .select('id')
+    .eq('stripe_price_annual_id', priceId)
+    .maybeSingle();
+  return annual?.id ?? null;
 }
 
 export async function resolvePlanIdFromSubscription(

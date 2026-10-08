@@ -37,8 +37,8 @@ npm run billing:setup
 ```
 
 O script:
-- Cria produto **CEO Brain** e preço **R$ 99/mês** (BRL) no Stripe test
-- Grava `stripe_price_monthly_id` na tabela `plans`
+- Cria produtos **RainMaker** e preços **mensais + anuais** (BRL) no Stripe test
+- Grava `stripe_price_monthly_id` e `stripe_price_annual_id` na tabela `plans`
 - Mostra as linhas para colar no `.env.local`
 
 Reinicie o dev server após salvar o `.env.local`:
@@ -46,6 +46,8 @@ Reinicie o dev server após salvar o `.env.local`:
 ```powershell
 npm run dev
 ```
+
+No `/billing`, use o toggle **Mensal / Anual** antes de assinar.
 
 ## 3. Testar checkout
 

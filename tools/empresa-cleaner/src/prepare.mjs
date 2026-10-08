@@ -13,6 +13,7 @@ function parseArgs(argv) {
     if (argv[index] === '--state') args.state = argv[++index];
     else if (argv[index] === '--input') args.input = argv[++index];
     else if (argv[index] === '--output') args.output = argv[++index];
+    else if (argv[index] === '--skip-xlsx') args.skipXlsx = true;
     else if (argv[index] === '--help' || argv[index] === '-h') args.help = true;
     else throw new Error(`Argumento desconhecido: ${argv[index]}`);
   }
@@ -46,7 +47,7 @@ function createXlsx(csvPath, xlsxPath) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log('Uso: npm run prepare -- --state sergipe [--input caminho] [--output caminho]');
+    console.log('Uso: npm run prepare -- --state sergipe [--input caminho] [--output caminho] [--skip-xlsx]');
     return;
   }
 
@@ -57,16 +58,22 @@ async function main() {
 
   const csvPath = join(output, 'empresas-tratadas.csv');
   const xlsxPath = join(output, 'empresas-tratadas.xlsx');
-  createXlsx(csvPath, xlsxPath);
-  if (!existsSync(xlsxPath) || statSync(xlsxPath).size === 0) {
-    throw new Error('O arquivo XLSX não foi gerado corretamente');
+  const csvBytes = existsSync(csvPath) ? statSync(csvPath).size : 0;
+  const skipXlsx = Boolean(args.skipXlsx) || csvBytes > 80 * 1024 * 1024;
+  if (skipXlsx) {
+    console.log('XLSX omitido (arquivo grande ou --skip-xlsx). Use o CSV para o banco.');
+  } else {
+    createXlsx(csvPath, xlsxPath);
+    if (!existsSync(xlsxPath) || statSync(xlsxPath).size === 0) {
+      throw new Error('O arquivo XLSX não foi gerado corretamente');
+    }
   }
 
   console.log('');
   console.log(`Estado preparado: ${state}`);
   console.log(`Empresas únicas: ${report.uniqueCompanies.toLocaleString('pt-BR')}`);
   console.log(`CSV para banco: ${csvPath}`);
-  console.log(`XLSX para conferência: ${xlsxPath}`);
+  if (!skipXlsx) console.log(`XLSX para conferência: ${xlsxPath}`);
   console.log('Supabase: nenhuma importação executada');
 }
 

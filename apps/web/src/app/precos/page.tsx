@@ -263,7 +263,7 @@ export default function PrecosPage() {
                 </tr>
                 <tr>
                   <td className="precos-table-sticky">Importação de carteira</td>
-                  <MatrixCell slug="free">Sim</MatrixCell>
+                  <MatrixCell slug="free">—</MatrixCell>
                   <MatrixCell slug="regional_1">Sim</MatrixCell>
                   <MatrixCell slug="regional_3">Sim</MatrixCell>
                   <MatrixCell slug="nacional">Sim</MatrixCell>

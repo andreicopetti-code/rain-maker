@@ -11,8 +11,11 @@ import {
   getAppUrl,
   getStripe,
   isStripeConfigured,
+  resolveAnnualPriceId,
   resolveMonthlyPriceId,
+  resolvePlanPriceId,
 } from '@/lib/billing/stripe';
+import type { BillingInterval } from '@/lib/billing/intervals';
 import { BILLING_ACCESS_COOKIE } from '@/lib/billing/access-cache';
 import { syncFromCheckoutSession } from '@/lib/billing/checkout-sync';
 import {
@@ -31,8 +34,12 @@ export type BillingPlanOption = {
   name: string;
   priceMonthly: number;
   priceAnnual: number;
+  /** Economia anual vs 12× mensal (R$). */
+  annualSavings: number;
   stripePriceMonthlyId: string | null;
+  stripePriceAnnualId: string | null;
   stripeConfigured: boolean;
+  stripeAnnualConfigured: boolean;
   highlights: string[];
   ufLabel: string;
   fichaLabel: string;
@@ -45,6 +52,7 @@ export type BillingPlan = {
   priceMonthly: number;
   priceAnnual: number;
   stripePriceMonthlyId: string | null;
+  stripePriceAnnualId: string | null;
   limits: ReturnType<typeof getLimitsFromFeatures>;
 };
 
@@ -95,7 +103,7 @@ async function loadOrganization(orgId: string) {
       id, name, plan_id, subscription_status, trial_ends_at,
       subscription_started_at, subscription_ended_at,
       stripe_customer_id, stripe_subscription_id,
-      plan:plans(id, name, price_monthly, price_annual, stripe_price_monthly_id, features)
+      plan:plans(id, name, price_monthly, price_annual, stripe_price_monthly_id, stripe_price_annual_id, features)
     `)
     .eq('id', orgId)
     .single();
@@ -112,6 +120,7 @@ function toBillingPlan(raw: unknown): BillingPlan | null {
     price_monthly: number;
     price_annual: number;
     stripe_price_monthly_id: string | null;
+    stripe_price_annual_id: string | null;
     features: unknown;
   };
   const parsed = parsePlanFeatures(p.features);
@@ -123,6 +132,7 @@ function toBillingPlan(raw: unknown): BillingPlan | null {
     priceMonthly: Number(p.price_monthly),
     priceAnnual: Number(p.price_annual),
     stripePriceMonthlyId: p.stripe_price_monthly_id,
+    stripePriceAnnualId: p.stripe_price_annual_id,
     limits: getLimitsFromFeatures(p.features),
   };
 }
@@ -131,7 +141,7 @@ async function loadPlanBySlug(slug: PlanSlug) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('plans')
-    .select('id, name, price_monthly, price_annual, stripe_price_monthly_id, features')
+    .select('id, name, price_monthly, price_annual, stripe_price_monthly_id, stripe_price_annual_id, features')
     .contains('features', { slug })
     .maybeSingle();
 
@@ -146,7 +156,7 @@ export async function listBillingPlans(): Promise<BillingPlanOption[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('plans')
-    .select('id, name, price_monthly, price_annual, stripe_price_monthly_id, features');
+    .select('id, name, price_monthly, price_annual, stripe_price_monthly_id, stripe_price_annual_id, features');
 
   const stripeOk = isStripeConfigured();
 
@@ -155,15 +165,21 @@ export async function listBillingPlans(): Promise<BillingPlanOption[]> {
       (d) => parsePlanFeatures(d.features)?.slug === catalog.slug,
     );
     const limits = catalog.limits;
-    const priceId = resolveMonthlyPriceId(row?.stripe_price_monthly_id);
+    const priceMonthly = row ? Number(row.price_monthly) : catalog.price_monthly;
+    const priceAnnual = row ? Number(row.price_annual) : catalog.price_annual;
+    const monthlyId = resolveMonthlyPriceId(row?.stripe_price_monthly_id);
+    const annualId = resolveAnnualPriceId(row?.stripe_price_annual_id);
     return {
       id: row?.id ?? catalog.slug,
       slug: catalog.slug,
       name: catalog.name,
-      priceMonthly: row ? Number(row.price_monthly) : catalog.price_monthly,
-      priceAnnual: row ? Number(row.price_annual) : catalog.price_annual,
+      priceMonthly,
+      priceAnnual,
+      annualSavings: Math.max(0, Math.round(priceMonthly * 12 - priceAnnual)),
       stripePriceMonthlyId: row?.stripe_price_monthly_id ?? null,
-      stripeConfigured: stripeOk && !!priceId,
+      stripePriceAnnualId: row?.stripe_price_annual_id ?? null,
+      stripeConfigured: stripeOk && !!monthlyId,
+      stripeAnnualConfigured: stripeOk && !!annualId,
       highlights: catalog.highlights,
       ufLabel: formatUfLimit(limits),
       fichaLabel: formatFichaLimit(limits),
@@ -210,11 +226,15 @@ export async function getBillingSummary(): Promise<BillingSummary | null> {
 
 export async function createCheckoutSession(
   planSlug: PlanSlug,
+  interval: BillingInterval = 'month',
 ): Promise<{ url: string } | { error: string }> {
   try {
     const catalog = getPlanBySlug(planSlug);
     if (!catalog?.purchasable) {
       return { error: 'Plano inválido ou não disponível para assinatura.' };
+    }
+    if (interval !== 'month' && interval !== 'year') {
+      return { error: 'Intervalo de cobrança inválido.' };
     }
 
     const { user, membership } = await getAuthContext();
@@ -227,15 +247,23 @@ export async function createCheckoutSession(
 
     const org = await loadOrganization(membership.organization_id);
     const targetPlan = await loadPlanBySlug(planSlug);
-    const priceId = resolveMonthlyPriceId(targetPlan.stripePriceMonthlyId);
+    const priceId = resolvePlanPriceId(
+      interval,
+      targetPlan.stripePriceMonthlyId,
+      targetPlan.stripePriceAnnualId,
+    );
     if (!priceId) {
       return {
-        error: `Price ID do Stripe não configurado para ${targetPlan.name}. Rode npm run billing:setup.`,
+        error:
+          interval === 'year'
+            ? `Preço anual do Stripe não configurado para ${targetPlan.name}. Rode npm run billing:setup.`
+            : `Price ID do Stripe não configurado para ${targetPlan.name}. Rode npm run billing:setup.`,
       };
     }
 
     const stripe = getStripe();
     const appUrl = getAppUrl();
+    const billingInterval = interval === 'year' ? 'annual' : 'monthly';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -250,12 +278,14 @@ export async function createCheckoutSession(
         user_id: user.id,
         plan_id: targetPlan.id,
         plan_slug: planSlug,
+        billing_interval: billingInterval,
       },
       subscription_data: {
         metadata: {
           organization_id: org.id,
           plan_id: targetPlan.id,
           plan_slug: planSlug,
+          billing_interval: billingInterval,
         },
       },
     });

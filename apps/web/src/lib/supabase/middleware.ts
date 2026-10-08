@@ -87,20 +87,23 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  let user = null;
+  // getClaims verifica o JWT localmente (JWKS em cache). getUser() ia ao Auth
+  // a cada troca de tela e deixava a navegação lenta.
+  let userId: string | null = null;
   let authTimedOut = false;
+  const isPrefetch = request.headers.get('next-router-prefetch') === '1';
   try {
-    ({
-      data: { user },
-    } = await withTimeout(supabase.auth.getUser(), 4_000));
+    const { data } = await withTimeout(supabase.auth.getClaims(), 2_000);
+    const sub = data?.claims?.sub;
+    userId = typeof sub === 'string' && sub.length > 0 ? sub : null;
   } catch {
     authTimedOut = true;
-    // Auth/Postgres lento: não bloqueia o middleware até o 504 da Vercel.
+    // Auth/JWKS lento: não bloqueia o middleware até o 504 da Vercel.
   }
 
   // Sem user confirmado: em rota protegida, só manda p/ login se não há cookie de sessão.
   // Se o Auth timeoutou mas o cookie existe, deixa a página/SSR decidir (fail-open temporário).
-  if (!user && isProtected) {
+  if (!userId && isProtected) {
     if (authTimedOut && hasSupabaseAuthCookie(request)) {
       return supabaseResponse;
     }
@@ -112,7 +115,7 @@ export async function updateSession(request: NextRequest) {
     return res;
   }
 
-  if (user && isAuthRoute) {
+  if (userId && isAuthRoute) {
     const url = request.nextUrl.clone();
     const redirect = url.searchParams.get('redirect');
     url.pathname = redirect && redirect.startsWith('/') ? redirect : '/funil';
@@ -122,7 +125,7 @@ export async function updateSession(request: NextRequest) {
     return res;
   }
 
-  if (user && pathname === '/') {
+  if (userId && pathname === '/') {
     const url = request.nextUrl.clone();
     url.pathname = '/funil';
     const res = NextResponse.redirect(url);
@@ -131,17 +134,22 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Em /billing, limpa o cache para revalidar após checkout/cancelamento.
-  if (user && isBillingRoute) {
+  if (userId && isBillingRoute) {
     supabaseResponse.cookies.set(BILLING_ACCESS_COOKIE, '', {
       ...billingAccessCookieOptions(0),
       maxAge: 0,
     });
   }
 
-  if (user && isProtected && !isBillingRoute && !isInviteRoute) {
+  if (userId && isProtected && !isBillingRoute && !isInviteRoute) {
+    // Prefetch do menu não precisa de RPC de billing — a navegação real revalida.
+    if (isPrefetch) {
+      return supabaseResponse;
+    }
+
     const cached = readBillingAccessCache(
       request.cookies.get(BILLING_ACCESS_COOKIE)?.value,
-      user.id,
+      userId,
     );
 
     // Só reutiliza cache positivo: bloqueio sempre revalida (pós-pagamento).
@@ -150,14 +158,14 @@ export async function updateSession(request: NextRequest) {
     if (hasAccess === undefined) {
       try {
         const billing = await withTimeout(
-          getBillingAccessForUser(supabase, user.id),
+          getBillingAccessForUser(supabase, userId),
           3_000,
         );
         hasAccess = billing.hasAccess;
         if (billing.hasAccess) {
           supabaseResponse.cookies.set(
             BILLING_ACCESS_COOKIE,
-            buildBillingAccessCookieValue(user.id, true),
+            buildBillingAccessCookieValue(userId, true),
             billingAccessCookieOptions(),
           );
         } else {

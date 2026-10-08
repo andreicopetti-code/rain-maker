@@ -73,6 +73,43 @@
   grid-column: 1 / -1;
 }
 
+.billing-interval-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin: 4px 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background: var(--surface2, #f8fafc);
+}
+
+.billing-interval-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.billing-interval-btn.selected {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--border2);
+}
+
+.billing-interval-save {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--green, #15803d);
+}
+
 .billing-plan-picker {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
