@@ -135,7 +135,7 @@ export function AppPageCachePanes({ children }: { children: ReactNode }) {
   );
 
   return (
-    <>
+    <div className="app-page-cache-stack">
       {keys.map((key) => {
         const active = key === displayKey;
         const node =
@@ -155,6 +155,6 @@ export function AppPageCachePanes({ children }: { children: ReactNode }) {
           </div>
         );
       })}
-    </>
+    </div>
   );
 }

@@ -639,6 +639,16 @@ body {
   overflow: hidden;
 }
 
+/* Keep-alive das abas: preserva a cadeia flex (Agenda/Funil precisam de altura). */
+.app-page-cache-stack,
+.app-page-cache-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .board-page { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 .board-main { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 .cnpj-page-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
