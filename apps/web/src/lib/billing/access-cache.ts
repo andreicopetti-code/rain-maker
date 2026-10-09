@@ -1,7 +1,8 @@
 /** Cookie curto para evitar RPC de billing a cada navegação. */
 
 export const BILLING_ACCESS_COOKIE = 'cb_billing_access';
-export const BILLING_ACCESS_TTL_MS = 90_000;
+/** 5 min: troca de abas não reconsulta billing a cada navegação. */
+export const BILLING_ACCESS_TTL_MS = 300_000;
 
 type BillingAccessCache = {
   /** 1 = liberado, 0 = bloqueado */

@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { getUnreadEmailCount } from '@/app/emails/actions';
 import { FunnelHeaderTools } from '@/components/funnel/FunnelHeaderTools';
@@ -11,8 +11,20 @@ import { UserMenu } from '@/components/UserMenu';
 import { useTheme } from '@/components/ThemeProvider';
 import { APP_AI_NAME, APP_AI_NAV_LABEL, APP_LOGO_PATH, APP_NAME } from '@/lib/brand';
 
+/** Rotas do menu — aquecer RSC no mount para o 1º clique já vir do cache. */
+const MAIN_NAV_HREFS = [
+  '/funil',
+  '/agenda',
+  '/dashboard',
+  '/contatos',
+  '/emails',
+  '/empresas',
+  '/ceo',
+] as const;
+
 export function AppHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const isFunil = pathname.startsWith('/funil');
   const isDashboard = pathname.startsWith('/dashboard');
   const isAgenda = pathname.startsWith('/agenda');
@@ -25,6 +37,12 @@ export function AppHeader() {
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
+    for (const href of MAIN_NAV_HREFS) {
+      router.prefetch(href);
+    }
+  }, [router]);
+
+  useEffect(() => {
     startTransition(async () => {
       const count = await getUnreadEmailCount();
       setUnreadEmails(count);
@@ -34,7 +52,7 @@ export function AppHeader() {
 
   return (
     <header className="header">
-      <Link href="/funil" className="logo" prefetch={false}>
+      <Link href="/funil" className="logo" prefetch>
         <div className="logo-icon">
           <Image src={APP_LOGO_PATH} alt={APP_NAME} width={40} height={40} priority />
         </div>

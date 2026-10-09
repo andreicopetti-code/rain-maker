@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { normalizeScheduledAt, todayInAppTz } from '@/lib/appointments/datetime';
 import type { AppointmentTipo } from '@/components/board/types';
 import type { OrgMember } from '@/components/board/types';
+import { getSessionContext } from '@/lib/org/session-context';
 import { loadOrgMembers } from '@/lib/org/team-members';
 
 export type CalendarEvent = {
@@ -143,17 +144,8 @@ export async function getCalendarEvents(
   from: string,
   to: string,
 ): Promise<CalendarEvent[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  const { data: org } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single();
-  if (!org) return [];
+  const { supabase, user, org } = await getSessionContext();
+  if (!user || !org) return [];
 
   const todayStart = `${todayInAppTz()}T00:00:00-03:00`;
 
@@ -268,16 +260,8 @@ export async function deleteCalendarEvent(id: string): Promise<void> {
 export async function getOpportunitiesForSelect(): Promise<
   { id: string; label: string }[]
 > {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  const { data: org } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single();
-  if (!org) return [];
+  const { supabase, user, org } = await getSessionContext();
+  if (!user || !org) return [];
 
   const { data: opps } = await supabase
     .from('opportunities')
@@ -298,17 +282,8 @@ export async function getOpportunitiesForSelect(): Promise<
 }
 
 export async function getAgendaPageData(): Promise<AgendaPageData | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: org } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single();
-  if (!org) return null;
+  const { user, org } = await getSessionContext();
+  if (!user || !org) return null;
 
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();

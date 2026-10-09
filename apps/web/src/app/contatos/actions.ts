@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
 import type { OpportunityCustomFields } from '@/components/board/types';
 import type { FunnelStageConfig } from '@/lib/funnel/stage-config';
 import { parseStageConfig, stageLabel } from '@/lib/funnel/stage-config';
@@ -12,6 +11,7 @@ import {
   isContactPJ,
   parseContactCustomFields,
 } from '@/lib/contacts/utils';
+import { getSessionContext } from '@/lib/org/session-context';
 
 export type ContactsAgendaData = {
   items: ContactAgendaItem[];
@@ -33,13 +33,8 @@ function parseOppFields(raw: unknown): OpportunityCustomFields | null {
 }
 
 export async function getContactsAgenda(): Promise<ContactsAgendaData | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: orgRows } = await supabase.rpc('get_user_organization', { p_user_id: user.id });
-  const org = orgRows?.[0];
-  if (!org) return null;
+  const { supabase, user, org } = await getSessionContext();
+  if (!user || !org) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: funnel } = await (supabase as any)
@@ -129,15 +124,10 @@ export async function getContactsAgenda(): Promise<ContactsAgendaData | null> {
 }
 
 async function getAuthContext() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Não autenticado');
-
-  const { data: orgRows } = await supabase.rpc('get_user_organization', { p_user_id: user.id });
-  const org = orgRows?.[0];
-  if (!org) throw new Error('Organização não encontrada');
-
-  return { supabase, user, org };
+  const ctx = await getSessionContext();
+  if (!ctx.user) throw new Error('Não autenticado');
+  if (!ctx.org) throw new Error('Organização não encontrada');
+  return { supabase: ctx.supabase, user: ctx.user, org: ctx.org };
 }
 
 /** Exclui contato e deals vinculados (soft delete). */

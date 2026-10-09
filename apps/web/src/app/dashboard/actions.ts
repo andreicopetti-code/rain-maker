@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { getSessionContext } from '@/lib/org/session-context';
 import { loadOrgMembers, memberDisplayName } from '@/lib/org/team-members';
 import { parseStageConfig, type FunnelStageConfig } from '@/lib/funnel/stage-config';
 import type { DashboardOpp } from '@/lib/dashboard/metrics';
@@ -21,13 +22,8 @@ export type DashboardData = {
 };
 
 export async function getDashboardData(): Promise<DashboardData | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: orgRows } = await supabase.rpc('get_user_organization', { p_user_id: user.id });
-  const org = orgRows?.[0];
-  if (!org) return null;
+  const { supabase, user, org } = await getSessionContext();
+  if (!user || !org) return null;
 
   const orgId = org.organization_id;
 
@@ -93,6 +89,7 @@ export async function getDashboardData(): Promise<DashboardData | null> {
   const plus7d = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const minus7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const minus30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const minus90d = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -107,10 +104,12 @@ export async function getDashboardData(): Promise<DashboardData | null> {
           .order('scheduled_at', { ascending: true })
       : Promise.resolve({ data: [] as Array<{ opportunity_id: string; scheduled_at: string; tipo: string }> }),
 
+    // Janela de 90 dias cobre last7/last30/demos sem puxar histórico inteiro.
     oppIds.length
       ? sb.from('appointments')
           .select('opportunity_id, scheduled_at, tipo, done, created_at')
           .in('opportunity_id', oppIds)
+          .or(`scheduled_at.gte.${minus90d.toISOString()},created_at.gte.${minus90d.toISOString()}`)
       : Promise.resolve({ data: [] as Array<{ opportunity_id: string; scheduled_at: string; tipo: string; done: boolean; created_at: string }> }),
 
     sb.from('appointments')

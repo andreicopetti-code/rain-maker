@@ -1,7 +1,6 @@
 'use client';
 
 import Link, { useLinkStatus } from 'next/link';
-import { useRouter } from 'next/navigation';
 import type { CSSProperties, ReactNode } from 'react';
 
 function NavPendingMark() {
@@ -26,19 +25,10 @@ export function HeaderNavLink({
   className,
   style,
 }: HeaderNavLinkProps) {
-  const router = useRouter();
-
-  function prefetchRoute() {
-    router.prefetch(href);
-  }
-
   return (
     <Link
       href={href}
-      prefetch={false}
-      onPointerEnter={prefetchRoute}
-      onFocus={prefetchRoute}
-      onTouchStart={prefetchRoute}
+      prefetch
       aria-label={ariaLabel}
       aria-current={active ? 'page' : undefined}
       className={`btn-nav${active ? ' active' : ''}${className ? ` ${className}` : ''}`}

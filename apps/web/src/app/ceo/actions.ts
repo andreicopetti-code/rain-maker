@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { parseStageConfig } from '@/lib/funnel/stage-config';
 import type { FunnelStageConfig } from '@/lib/funnel/stage-config';
 import { getOrgPlanContext } from '@/lib/billing/org-plan-limits';
+import { getSessionContext } from '@/lib/org/session-context';
 import {
   buildFunnelContext,
   buildDealsParados,
@@ -215,15 +216,8 @@ export type CeoPageData = {
 // ── Auth + Data Loader ─────────────────────────────────────────────────────────
 
 async function loadCeoData() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, org } = await getSessionContext();
   if (!user) throw new Error('Não autenticado');
-
-  const { data: orgRows } = await supabase.rpc('get_user_organization', { p_user_id: user.id });
-  const org = orgRows?.[0];
   if (!org) throw new Error('Organização não encontrada');
 
   const orgId: string = org.organization_id;

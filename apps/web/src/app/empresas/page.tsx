@@ -1,13 +1,12 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { CnpjSearch } from '@/components/cnpj/CnpjSearch';
+import { getSessionContext } from '@/lib/org/session-context';
 import { getEmpresaCount, getCnpjUsage, getCnpjHistory } from './actions';
 import { getOrganizationUfSettings } from '@/app/configuracoes/actions';
 import './empresas.css';
 
 export default async function EmpresasPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSessionContext();
   if (!user) redirect('/');
 
   const withDeadline = <T,>(p: Promise<T>, fallback: T, ms = 8_000) =>

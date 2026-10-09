@@ -1,13 +1,11 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { PlanUpgradeGate } from '@/components/billing/PlanUpgradeGate';
+import { getSessionContext } from '@/lib/org/session-context';
 import { getCeoPageData } from './actions';
 import { CeoChat } from '@/components/ceo/CeoChat';
 
 export default async function CeoPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
+  const { user } = await getSessionContext();
   if (!user) redirect('/login');
 
   const result = await getCeoPageData();

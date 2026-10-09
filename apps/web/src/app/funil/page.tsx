@@ -3,8 +3,8 @@ import { Suspense } from 'react';
 import { KanbanBoard } from '@/components/board/KanbanBoard';
 import type { ContactData, NextAppointment, OrgMember, OpportunityCustomFields, OpportunityItem } from '@/components/board/types';
 import { isOrgAdmin } from '@/lib/org/deal-access';
+import { getSessionContext } from '@/lib/org/session-context';
 import { loadOrgMembers } from '@/lib/org/team-members';
-import { createClient } from '@/lib/supabase/server';
 import { parseStageConfig } from '@/lib/funnel/stage-config';
 
 function parseCustomFields(raw: unknown): OpportunityCustomFields | null {
@@ -18,15 +18,8 @@ function parseContactFields(raw: unknown): ContactData['custom_fields'] | undefi
 }
 
 export default async function FunilPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user, org } = await getSessionContext();
   if (!user) redirect('/login');
-
-  // ── Round 1: org + user context (parallel) ──────────────────────────────
-  const [{ data: orgRows }] = await Promise.all([
-    supabase.rpc('get_user_organization', { p_user_id: user.id }),
-  ]);
-  const org = orgRows?.[0];
 
   const { data: orgRow } = org
     ? await supabase.from('organizations').select('name').eq('id', org.organization_id).single()
