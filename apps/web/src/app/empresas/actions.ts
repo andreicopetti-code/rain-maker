@@ -119,14 +119,25 @@ export async function getEmpresaCount(): Promise<number> {
   } else if (access.selectedUfs.length > 0) {
     ufs = access.selectedUfs.map((uf) => uf.trim().toUpperCase()).filter(Boolean);
   } else {
+    // Sem UF escolhida: não fingir "conectando" — o seletor de UF resolve.
     return 0;
   }
 
-  const { data, error } = await db(supabase).rpc('count_empresas', {
-    p_ufs: ufs,
-  });
-  if (!error && typeof data === 'number') return data;
-  if (!error && typeof data === 'string' && /^\d+$/.test(data)) return Number(data);
+  // RPC em tabela grande pode travar; fallback local em até 2s evita status preso.
+  try {
+    const rpc = db(supabase).rpc('count_empresas', { p_ufs: ufs });
+    const timed = await Promise.race([
+      rpc,
+      new Promise<{ data: null; error: { message: string } }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: { message: 'count_timeout' } }), 2_000),
+      ),
+    ]);
+    const { data, error } = timed;
+    if (!error && typeof data === 'number') return data;
+    if (!error && typeof data === 'string' && /^\d+$/.test(data)) return Number(data);
+  } catch {
+    // cai no fallback
+  }
 
   // Não fazer COUNT(*) exact aqui: em tabela grande / disco saturado estoura
   // statement_timeout (~30s) e deixa /empresas no skeleton ou 504.

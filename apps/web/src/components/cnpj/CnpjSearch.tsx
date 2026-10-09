@@ -589,11 +589,20 @@ export function CnpjSearch({ initialCount, initialUsage, initialHistory, initial
     : ufSettings?.selectedUfs.length
       ? ufSettings.selectedUfs.join(', ')
       : null;
+  const needsUfSelection = Boolean(ufSettings?.needsSelection);
+  const baseReady = initialCount > 0 || (!needsUfSelection && ufSettings != null);
   const totalFmt = initialCount > 0
     ? contractedUfLabel
       ? `${initialCount.toLocaleString('pt-BR')} empresas (${contractedUfLabel})`
       : `${initialCount.toLocaleString('pt-BR')} empresas`
-    : 'Base RainMaker';
+    : contractedUfLabel
+      ? `Base RainMaker (${contractedUfLabel})`
+      : 'Base RainMaker';
+  const syncMsg = needsUfSelection
+    ? 'Selecione as UFs do plano para ativar a base'
+    : initialCount > 0
+      ? `✓ Base RainMaker · ${totalFmt}`
+      : `✓ ${totalFmt} pronta`;
 
   return (
     <div className="cnpj-page">
@@ -639,9 +648,9 @@ export function CnpjSearch({ initialCount, initialUsage, initialHistory, initial
       {/* Status bar */}
       <div className="cnpj-statusbar">
         <div className="cnpj-sync-info">
-          <span className={`cnpj-sync-dot ${initialCount > 0 ? 'ok' : 'loading'}`} />
+          <span className={`cnpj-sync-dot ${baseReady ? 'ok' : needsUfSelection ? 'loading' : 'ok'}`} />
           <span className="cnpj-sync-msg">
-            {initialCount > 0 ? `✓ Base RainMaker · ${totalFmt}` : 'Conectando à Base RainMaker...'}
+            {syncMsg}
           </span>
         </div>
         <button className="cnpj-recarregar-btn" onClick={handleRecarregar}>
