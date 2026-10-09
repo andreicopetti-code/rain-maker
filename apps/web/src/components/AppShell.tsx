@@ -3,6 +3,7 @@
 import '@/app/billing/billing.css';
 import { usePathname } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
+import { AppPageCachePanes, AppPageCacheProvider } from '@/components/AppPageCache';
 import { SubscriptionBanner } from '@/components/billing/SubscriptionBanner';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { FunnelChromeProvider } from '@/lib/funnel/funnel-chrome-context';
@@ -26,11 +27,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <FunnelChromeProvider>
-        <div className="app-shell">
-          <AppHeader />
-          {!pathname.startsWith('/billing') && <SubscriptionBanner />}
-          <div className="app-shell-content">{children}</div>
-        </div>
+        <AppPageCacheProvider>
+          <div className="app-shell">
+            <AppHeader />
+            {!pathname.startsWith('/billing') && <SubscriptionBanner />}
+            <div className="app-shell-content">
+              <AppPageCachePanes>{children}</AppPageCachePanes>
+            </div>
+          </div>
+        </AppPageCacheProvider>
       </FunnelChromeProvider>
     </ThemeProvider>
   );

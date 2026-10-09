@@ -5,42 +5,36 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { getUnreadEmailCount } from '@/app/emails/actions';
+import { usePageCache } from '@/components/AppPageCache';
 import { FunnelHeaderTools } from '@/components/funnel/FunnelHeaderTools';
 import { HeaderNavLink } from '@/components/HeaderNavLink';
 import { UserMenu } from '@/components/UserMenu';
 import { useTheme } from '@/components/ThemeProvider';
 import { APP_AI_NAME, APP_AI_NAV_LABEL, APP_LOGO_PATH, APP_NAME } from '@/lib/brand';
-
-/** Rotas do menu — aquecer RSC no mount para o 1º clique já vir do cache. */
-const MAIN_NAV_HREFS = [
-  '/funil',
-  '/agenda',
-  '/dashboard',
-  '/contatos',
-  '/emails',
-  '/empresas',
-  '/ceo',
-] as const;
+import { MAIN_NAV_HREFS } from '@/lib/nav/main-nav';
 
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const isFunil = pathname.startsWith('/funil');
-  const isDashboard = pathname.startsWith('/dashboard');
-  const isAgenda = pathname.startsWith('/agenda');
-  const isContatos = pathname.startsWith('/contatos');
-  const isEmails = pathname.startsWith('/emails');
-  const isCeo = pathname.startsWith('/ceo');
-  const isEmpresas = pathname.startsWith('/empresas');
+  const { activeNavKey } = usePageCache();
+  const nav = activeNavKey ?? pathname;
+  const isFunil = nav.startsWith('/funil');
+  const isDashboard = nav.startsWith('/dashboard');
+  const isAgenda = nav.startsWith('/agenda');
+  const isContatos = nav.startsWith('/contatos');
+  const isEmails = nav.startsWith('/emails');
+  const isCeo = nav.startsWith('/ceo');
+  const isEmpresas = nav.startsWith('/empresas');
   const [unreadEmails, setUnreadEmails] = useState(0);
   const [, startTransition] = useTransition();
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     for (const href of MAIN_NAV_HREFS) {
+      // Link já usa prefetch={true} (FULL). Aqui reaquece após cada troca de rota.
       router.prefetch(href);
     }
-  }, [router]);
+  }, [router, pathname]);
 
   useEffect(() => {
     startTransition(async () => {

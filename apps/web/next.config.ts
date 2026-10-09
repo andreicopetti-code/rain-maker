@@ -3,11 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   transpilePackages: ['@ceo-brain/shared'],
   experimental: {
-    // Next 15 zera o cache do cliente (0s). 60s cobre troca rápida de abas
-    // sem deixar Funil/Dashboard defasados depois de uma edição (revalidatePath limpa).
+    // Next 15 zera o cache do cliente (0s) por padrão — abas refetcham sempre.
+    // dynamic: após visitar; static: prefetch={true}/router.prefetch FULL.
+    // revalidatePath nas mutations ainda força dados frescos após edições.
     staleTimes: {
-      dynamic: 60,
-      static: 300,
+      dynamic: 300,
+      static: 600,
     },
   },
   async redirects() {
